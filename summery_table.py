@@ -19,24 +19,23 @@ FILENAME = "university_records.csv"
 
 
 def get_list_of_files(dir_name):
-    # create a list of file and sub directories
-    # names in the given directory
+    """
+    This function creates and returns list of all files inside directories and subdirectories.
+    :param dir_name: Path to parent directory
+    :return: List of all files present in directory and sub-directories.
+    """
     list_of_file = os.listdir(dir_name)
     all_files = []
-    # Iterate over all the entries
     for entry in list_of_file:
-        # Create full path
-        fullPath = os.path.join(dir_name, entry)
-        # If entry is a directory then get the list of files in this directory
-        if os.path.isdir(fullPath):
-            all_files = all_files + get_list_of_files(fullPath)
+        full_path = os.path.join(dir_name, entry)
+        if os.path.isdir(full_path):
+            all_files = all_files + get_list_of_files(full_path)
         else:
-            all_files.append(fullPath)
-
+            all_files.append(full_path)
     return all_files
 
 
-def create_csv(filename, field):
+def create_csv_file(filename, field):
     """
     This function creates a csv file containing summery table if not already exists.
     :param filename: CSV file name
@@ -65,7 +64,6 @@ def get_description(md_file):
     a_file = open("demo.txt", "r")
     for number, line in enumerate(a_file):
         if "Test Description" in line:
-            line_number = number
             break
     contents = a_file.readlines()
     if os.path.exists("demo.txt"):
@@ -76,15 +74,23 @@ def get_description(md_file):
 def check_repeated_data(check_id):
     """
     This Function checks if the particular record is already exists in the csv file.
-    :param id: Unique ID of the test case
+    :param check_id: Unique ID of the test case
     :return: True if record is not exists, otherwise False.
     """
-    data = pd.read_csv("university_records.csv")
-    ids = data['Test ID'].tolist()
-    if check_id in ids:
-        return True
-    else:
-        return False
+    lines = list()
+    with open('university_records.csv', 'r') as read_file:
+        reader = csv.reader(read_file)
+        for row in reader:
+            lines.append(row)
+            for field in row:
+                if field == check_id:
+                    lines.remove(row)
+    read_file.close()
+    with open('university_records.csv', 'w') as write_file:
+        writer = csv.writer(write_file)
+        writer.writerows(lines)
+    write_file.close()
+    return True
 
 
 def write_data(filename, md_file, feature):
@@ -95,9 +101,9 @@ def write_data(filename, md_file, feature):
     :param md_file: MD File Name
     :param feature: Test Feature
     """
-    row = [[feature]]
-    with open(filename, 'a+') as csvfile:
-        writer_obj = csv.writer(csvfile)
+    row = [feature]
+    with open(filename, 'a+') as csv_file:
+        writer_obj = csv.writer(csv_file)
         table_data = pd.read_table(md_file, sep="|", header=1, index_col=1, skipinitialspace=True)
         table_row = table_data.dropna(axis=1, how='all')
         for i in range(1, 7):
@@ -105,16 +111,13 @@ def write_data(filename, md_file, feature):
             if str(var) == 'nan':
                 var = "NA"
             var = var.strip()
-            row.append([var])
+            row.append(var)
         description = get_description(md_file).rstrip()
-        row.append([description])
-        # print(row[1])
-        if not check_repeated_data("{}".format(row[1])):
+        row.append(description)
+        print(row[1])
+        if check_repeated_data("{}".format(row[1])):
             writer_obj.writerow(row)
-        else:
-            print("Record Already exists.")
-            csvfile.close()
-    csvfile.close()
+    csv_file.close()
 
 
 parser = argparse.ArgumentParser()
@@ -122,9 +125,9 @@ parser.add_argument("--directory", help="Add Test Feature", default="/home/afour
 args = parser.parse_args()
 
 
-def create_summery():
+def create_summery_table():
     path = args.directory
-    create_csv(FILENAME, FIELDS)
+    create_csv_file(FILENAME, FIELDS)
     list_of_files = get_list_of_files(path)
     for f in list_of_files:
         name, exts = os.path.splitext(f)
@@ -133,9 +136,12 @@ def create_summery():
             write_data(FILENAME, f, feature)
             continue
         else:
-            print("File extension is other than .md. Skipping...")
+            print("File extension is other than .md. Skipping the file...")
             continue
+    csv_to_convert = pd.read_csv("university_records.csv")
+    csv_to_convert.to_html("index.html")
 
 
 # Start of the Program
-create_summery()
+create_summery_table()
+print("Summery Table Created. Please open index.html in your browser.")
