@@ -5,6 +5,11 @@ import argparse
 import markdown
 from bs4 import BeautifulSoup
 
+"""
+This script takes absolute path of the directory containing all the *.md files
+and add summery of each file in the summery table.
+"""
+
 # field names
 FIELDS = ['Feature', 'Test ID', 'Last Tested', 'Image Version', 'Status', 'Automation', 'Jira', 'Test Description']
 
@@ -55,18 +60,6 @@ def check_repeated_data(check_id):
     :param id: Unique ID of the test case
     :return: True if record is not exists, otherwise False.
     """
-    print("Checking Repetition")
-    print(check_id)
-    # f = open(FILENAME, 'r')
-    # csvreader = csv.reader(f, delimiter=",")
-    # for row in csvreader:
-    #     print("Thisssss {}".format(row[1]))
-    #     if id[0] in row[1]:
-    #         f.close()
-    #         return True
-    #     else:
-    #         f.close()
-    #         return False
     data = pd.read_csv("university_records.csv")
     ids = data['Test ID'].tolist()
     if check_id in ids:
@@ -94,9 +87,9 @@ def write_data(filename, md_file, feature):
                 var = "NA"
             var = var.strip()
             row.append([var])
-        description = get_description(md_file)
+        description = get_description(md_file).rstrip()
         row.append([description])
-        print(row[1])
+        # print(row[1])
         if not check_repeated_data("{}".format(row[1])):
             writer_obj.writerow(row)
         else:
@@ -106,14 +99,18 @@ def write_data(filename, md_file, feature):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--file", help="Add md file ", default="test2.md")
-parser.add_argument("--feature", help="Add Test Feature", default="ACPI")
+parser.add_argument("--directory", help="Add Test Feature", default="/home/afour/lynx/Provisioning/")
 args = parser.parse_args()
 
 
-def main():
+def create_summery():
+    path = args.directory
+    feature = os.path.basename(os.path.normpath(args.directory))
     create_csv(FILENAME, FIELDS)
-    write_data(FILENAME, args.file, args.feature)
+    for f in os.listdir(path):
+        f = os.path.abspath("{}{}".format(path, f))
+        write_data(FILENAME, f, feature)
 
 
-main()
+# Start of the Program
+create_summery()
