@@ -4,6 +4,7 @@ import pandas as pd
 import argparse
 import markdown
 from bs4 import BeautifulSoup
+from pathlib import Path
 
 """
 This script takes absolute path of the directory containing all the *.md files
@@ -15,6 +16,24 @@ FIELDS = ['Feature', 'Test ID', 'Last Tested', 'Image Version', 'Status', 'Autom
 
 # name of csv file
 FILENAME = "university_records.csv"
+
+
+def get_list_of_files(dir_name):
+    # create a list of file and sub directories
+    # names in the given directory
+    list_of_file = os.listdir(dir_name)
+    all_files = []
+    # Iterate over all the entries
+    for entry in list_of_file:
+        # Create full path
+        fullPath = os.path.join(dir_name, entry)
+        # If entry is a directory then get the list of files in this directory
+        if os.path.isdir(fullPath):
+            all_files = all_files + get_list_of_files(fullPath)
+        else:
+            all_files.append(fullPath)
+
+    return all_files
 
 
 def create_csv(filename, field):
@@ -99,17 +118,23 @@ def write_data(filename, md_file, feature):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--directory", help="Add Test Feature", default="/home/afour/lynx/Provisioning/")
+parser.add_argument("--directory", help="Add Test Feature", default="/home/afour/lynx/IDT_Deployment/")
 args = parser.parse_args()
 
 
 def create_summery():
     path = args.directory
-    feature = os.path.basename(os.path.normpath(args.directory))
     create_csv(FILENAME, FIELDS)
-    for f in os.listdir(path):
-        f = os.path.abspath("{}{}".format(path, f))
-        write_data(FILENAME, f, feature)
+    list_of_files = get_list_of_files(path)
+    for f in list_of_files:
+        name, exts = os.path.splitext(f)
+        if exts == ".md":
+            feature = os.path.basename(os.path.normpath(Path(f).parent))
+            write_data(FILENAME, f, feature)
+            continue
+        else:
+            print("File extension is other than .md. Skipping...")
+            continue
 
 
 # Start of the Program
