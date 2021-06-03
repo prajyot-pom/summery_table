@@ -15,10 +15,10 @@ class SummeryGenerator:
     fields = ['Feature', 'Test ID', 'Last Tested', 'Image Version', 'Status', 'Automation', 'Designed-By', 'Keywords',
               'Test Description']
 
-    def __init__(self, file_name="summery_table.csv", test_dir="/home/kmalhotra/code/prajyot/lmm/test_procedure/docs/",
-                 html_file="index.html"):
+    test_dir1 = "{}/docs/".format(os.path.abspath(os.path.join(os.getcwd(), os.pardir)))
+
+    def __init__(self, file_name="summary_table.csv", html_file="index.html"):
         self.file_name = file_name
-        self.test_dir = test_dir
         self.html_file = html_file
         self.neg_files = []
 
@@ -37,9 +37,9 @@ class SummeryGenerator:
             else:
                 all_files.append(full_path)
         # create one more variable which contains list of excluded files
-        if "{}index.md".format(self.test_dir) in all_files:
-            self.neg_files.append("{}index.md".format(self.test_dir))
-            all_files.remove("{}index.md".format(self.test_dir))
+        if "{}index.md".format(SummeryGenerator.test_dir1) in all_files:
+            self.neg_files.append("{}index.md".format(SummeryGenerator.test_dir1))
+            all_files.remove("{}index.md".format(SummeryGenerator.test_dir1))
         return all_files
 
     def create_csv_file(self):
@@ -50,7 +50,6 @@ class SummeryGenerator:
         """
         if os.path.exists(self.file_name):
             os.remove(self.file_name)
-
         with open(self.file_name, 'w') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerow(SummeryGenerator.fields)
@@ -119,7 +118,6 @@ class SummeryGenerator:
         with open(self.file_name, 'a+') as csv_file:
             writer_obj = csv.writer(csv_file)
             try:
-                print(md_file)
                 table_data = pd.read_table(md_file, sep="|", header=1, index_col=1, skipinitialspace=True)
                 table_row = table_data.dropna(axis=1, how='all')
             except IndexError as e:
@@ -140,7 +138,7 @@ class SummeryGenerator:
 
     def create_summery_table(self):
         self.create_csv_file()
-        list_of_files = self.get_list_of_files(self.test_dir)
+        list_of_files = self.get_list_of_files(SummeryGenerator.test_dir1)
         for f in list_of_files:
             name, exts = os.path.splitext(f)
             if exts == ".md":
@@ -157,5 +155,7 @@ class SummeryGenerator:
         csv_to_convert.to_html(self.html_file)
 
 
-summery_obj = SummeryGenerator()
-summery_obj.create_summery_table()
+if __name__ == "__main__":
+    summery_obj = SummeryGenerator()
+    summery_obj.create_summery_table()
+    print("Summery Table created successfully. Please open index.html file in the browser")
