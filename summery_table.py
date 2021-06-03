@@ -1,10 +1,12 @@
 import csv
 import os
 import pandas as pd
-import argparse
 import markdown
 from bs4 import BeautifulSoup
 from pathlib import Path
+import sys
+from fpdf import FPDF
+
 
 """
 This script takes absolute path of the directory containing all the *.md files
@@ -12,10 +14,14 @@ and add summery of each file in the summery table.
 """
 
 # field names
-FIELDS = ['Feature', 'Test ID', 'Last Tested', 'Image Version', 'Status', 'Automation', 'Jira', 'Test Description']
+FIELDS = ['Feature', 'Test ID', 'Last Tested', 'Image Version', 'Status', 'Automation', 'Designed-By', 'Keywords',
+          'Test Description']
 
 # name of csv file
-FILENAME = "university_records.csv"
+FILENAME = "summery_table.csv"
+CURR = os.getcwd()
+print(CURR)
+TESTDIR = "{}/docs/".format(CURR)
 
 
 def get_list_of_files(dir_name):
@@ -32,6 +38,8 @@ def get_list_of_files(dir_name):
             all_files = all_files + get_list_of_files(full_path)
         else:
             all_files.append(full_path)
+    if "{}/docs/index.md".format(CURR) in all_files:
+        all_files.remove("{}/docs/index.md".format(CURR))
     return all_files
 
 
@@ -41,14 +49,15 @@ def create_csv_file(filename, field):
     :param filename: CSV file name
     :param field: Fields to be added in the csv file
     """
-    if not os.path.exists(FILENAME):
-        with open(filename, 'w') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(field)
-        csvfile.close()
+    if os.path.exists(FILENAME):
+        os.remove(FILENAME)
+    with open(filename, 'w') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(field)
+    csvfile.close()
 
 
-def get_description(md_file):
+def get_test_description(md_file):
     """
     This function converts the md file into html and from html to text using html parser
     and returns the test description.
@@ -58,27 +67,36 @@ def get_description(md_file):
     :return: Test Description in string format
     """
     html = markdown.markdown(open(md_file).read())
-    f = open("demo.txt", 'w')
+    f = open("temp.txt", 'w')
     f.write("".join(BeautifulSoup(html, features="html.parser").findAll(text=True)))
     f.close()
-    a_file = open("demo.txt", "r")
-    for number, line in enumerate(a_file):
-        if "Test Description" in line:
+    temp = open("temp.txt", "r")
+    for number, line in enumerate(temp):
+        if "Test Description" in line or "Description" in line:
             break
-    contents = a_file.readlines()
-    if os.path.exists("demo.txt"):
-        os.remove("demo.txt")
-    return contents[0]
+    contents = list()
+    for ln in temp.readlines():
+        if "Dependencies" not in ln:
+            contents.append(ln)
+        else:
+            break
+    if os.path.exists("temp.txt"):
+        os.remove("temp.txt")
+    if len(contents) == 1:
+        return contents[0]
+    else:
+        return ' '.join([str(elem).rstrip() for elem in contents])
 
 
 def check_repeated_data(check_id):
     """
     This Function checks if the particular record is already exists in the csv file.
+    If it is exists, this function delets the particular record.
     :param check_id: Unique ID of the test case
     :return: True if record is not exists, otherwise False.
     """
     lines = list()
-    with open('university_records.csv', 'r') as read_file:
+    with open(FILENAME, 'r') as read_file:
         reader = csv.reader(read_file)
         for row in reader:
             lines.append(row)
@@ -86,7 +104,7 @@ def check_repeated_data(check_id):
                 if field == check_id:
                     lines.remove(row)
     read_file.close()
-    with open('university_records.csv', 'w') as write_file:
+    with open(FILENAME, 'w') as write_file:
         writer = csv.writer(write_file)
         writer.writerows(lines)
     write_file.close()
@@ -104,31 +122,29 @@ def write_data(filename, md_file, feature):
     row = [feature]
     with open(filename, 'a+') as csv_file:
         writer_obj = csv.writer(csv_file)
-        table_data = pd.read_table(md_file, sep="|", header=1, index_col=1, skipinitialspace=True)
-        table_row = table_data.dropna(axis=1, how='all')
-        for i in range(1, 7):
+        try:
+            table_data = pd.read_table(md_file, sep="|", header=1, index_col=1, skipinitialspace=True)
+            table_row = table_data.dropna(axis=1, how='all')
+        except IndexError as e:
+            print("Index Error: {}".format(e))
+            sys.exit(1)
+        for i in range(1, 8):
             var = table_row.iloc[i, -1]
             if str(var) == 'nan':
                 var = "NA"
             var = var.strip()
             row.append(var)
-        description = get_description(md_file).rstrip()
+        description = get_test_description(md_file).rstrip()
         row.append(description)
-        print(row[1])
+
         if check_repeated_data("{}".format(row[1])):
             writer_obj.writerow(row)
     csv_file.close()
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--directory", help="Add Test Feature", default="/home/afour/lynx/IDT_Deployment/")
-args = parser.parse_args()
-
-
 def create_summery_table():
-    path = args.directory
     create_csv_file(FILENAME, FIELDS)
-    list_of_files = get_list_of_files(path)
+    list_of_files = get_list_of_files(TESTDIR)
     for f in list_of_files:
         name, exts = os.path.splitext(f)
         if exts == ".md":
@@ -136,12 +152,90 @@ def create_summery_table():
             write_data(FILENAME, f, feature)
             continue
         else:
-            print("File extension is other than .md. Skipping the file...")
+            print("File extension is other than .md. Skipping the file {}...".format(f))
             continue
-    csv_to_convert = pd.read_csv("university_records.csv")
+    csv_to_convert = pd.read_csv(FILENAME)
+    if os.path.exists("index.html"):
+        os.remove("index.html")
     csv_to_convert.to_html("index.html")
 
 
 # Start of the Program
 create_summery_table()
 print("Summery Table Created. Please open index.html in your browser.")
+
+
+# pdf = FPDF(orientation='L')
+# pdf.add_page()
+# page_width = pdf.w - 2 * pdf.l_margin
+#
+# pdf.set_font('Times', 'B', 14.0)
+# pdf.cell(page_width, 0.0, 'Summary Table', align='C')
+# pdf.ln(10)
+# print("This is page width:{}".format(page_width))
+# pdf.set_font('Courier', '', 8)
+#
+# col_width = page_width / 6
+#
+# pdf.ln(1)
+#
+# th = pdf.font_size
+# with open(FILENAME, newline='') as f:
+#     reader = csv.reader(f)
+#     for row in reader:
+#         pdf.cell(30, th, row[0], border=1)
+#         pdf.cell(30, th, row[1], border=1)
+#         pdf.cell(20, th, row[2], border=1)
+#         pdf.cell(25, th, row[3], border=1)
+#         pdf.cell(15, th, row[4], border=1)
+#         pdf.cell(20, th, row[5], border=1)
+#         pdf.cell(20, th, row[6], border=1)
+#         pdf.cell(20, th, row[7], border=1)
+#         pdf.cell(80, th, row[8], border=1)
+#         pdf.ln(th)
+#
+#     pdf.ln(10)
+#
+# pdf.set_font('Times', '', 10.0)
+# pdf.cell(page_width, 0.0, '- end of report -', align='C')
+#
+# pdf.output('summery_table.pdf', 'F')
+
+# ====================================================================
+# pdf = FPDF()
+# pdf.add_page()
+# page_width = pdf.w - 2 * pdf.l_margin
+#
+# pdf.set_font('Times', 'B', 14.0)
+# pdf.cell(page_width, 0.0, 'Students Data', align='C')
+# pdf.ln(10)
+#
+# pdf.set_font('Courier', '', 6)
+#
+# col_width = page_width / 10
+#
+# pdf.ln(1)
+#
+# th = pdf.font_size
+# with open(FILENAME, newline='') as f:
+#     reader = csv.reader(f)
+#     for row in reader:
+#         pdf.cell(col_width, th, str(row[0]), border=1)
+#         pdf.cell(col_width, th, row[1], border=1)
+#         pdf.cell(col_width, th, row[2], border=1)
+#         pdf.cell(col_width, th, row[3], border=1)
+#         # pdf.cell(col_width, th, str(row[0]), border=1)
+#         pdf.cell(col_width, th, row[4], border=1)
+#         pdf.cell(col_width, th, row[5], border=1)
+#         pdf.cell(col_width, th, row[6], border=1)
+#         # pdf.cell(col_width, th, str(row[0]), border=1)
+#         pdf.cell(col_width, th, row[7], border=1)
+#         pdf.cell(col_width, th, row[8], border=1)
+#         pdf.ln(th)
+#
+#     pdf.ln(10)
+#
+# pdf.set_font('Times', '', 8.0)
+# pdf.cell(page_width, 0.0, '- end of report -', align='C')
+#
+# pdf.output('student.pdf', 'F')
